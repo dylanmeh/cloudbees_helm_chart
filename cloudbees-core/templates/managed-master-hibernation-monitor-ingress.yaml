@@ -1,0 +1,47 @@
+{{- if .Values.Hibernation.Enabled -}}
+{{- if include "cloudbees-core.needs-ingress" . -}}
+apiVersion: {{ include "ingress.apiVersion" . }}
+kind: Ingress
+metadata:
+  name: managed-master-hibernation-monitor
+  labels:
+{{ include "cloudbees-core.labels" . | indent 4 }}
+  annotations:
+{{ include "hibernationMonitor.ingress.annotations" . | indent 4}}
+spec:
+  rules:
+  -
+{{- if (include "hibernation.hostnamewithoutport" . ) }}
+    host: {{ include "hibernation.hostnamewithoutport" . | quote }}
+{{- end }}
+    http:
+      paths:
+      - path: /hibernation/ns/{{ .Release.Namespace }}/
+        backend:
+{{ include "ingress.backend.hibernation" . | indent 10 }}
+{{- if eq (include "ingress.apiVersion" .) "networking.k8s.io/v1" }}
+        pathType: Prefix
+{{- else }}
+      - path: /hibernation/ns/{{ .Release.Namespace }}/*
+        backend:
+
+{{ include "ingress.backend.hibernation" . | indent 10 }}
+{{- end }}
+      - path: /hibernation/
+        backend:
+{{ include "ingress.backend.hibernation" . | indent 10 }}
+{{- if eq (include "ingress.apiVersion" .) "networking.k8s.io/v1" }}
+        pathType: Prefix
+{{- else }}
+      - path: /hibernation/*
+        backend:
+{{ include "ingress.backend.hibernation" . | indent 10 }}
+{{- end }}
+{{- if .Values.OperationsCenter.Ingress.tls.Enable }}
+  tls:
+    - hosts:
+        - {{ include "hibernation.hostnamewithoutport" .  | quote }}
+      secretName: {{ .Values.OperationsCenter.Ingress.tls.SecretName }}
+{{- end -}}
+{{- end -}}
+{{- end -}}

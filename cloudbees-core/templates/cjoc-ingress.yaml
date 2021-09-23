@@ -1,0 +1,56 @@
+{{- if .Values.OperationsCenter.Enabled -}}
+{{- if include "cloudbees-core.needs-ingress" . -}}
+{{- include "ingress.check" . -}}
+apiVersion: {{ include "ingress.apiVersion" . }}
+kind: Ingress
+metadata:
+  name: cjoc
+  labels:
+{{ include "cloudbees-core.labels" . | indent 4 }}
+  annotations:
+{{ include "cjoc.ingress.annotations" . | indent 4 }}
+{{- if not (include "cloudbees-core.is-openshift" .) }}
+    nginx.ingress.kubernetes.io/app-root: {{ include "ingress.root-redirect" . | quote }}
+    # "413 Request Entity Too Large" uploading plugins, increase client_max_body_size
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+{{- end }}
+spec:
+  rules:
+  -
+{{- if (include "oc.hostnamewithoutport" . ) }}
+    host: {{ include "oc.hostnamewithoutport" . | quote }}
+{{- end }}
+    http:
+      paths:
+{{- include "ingress.redirect-rules" . | indent 6 }}
+      - path: {{ include "oc.contextpath" . | quote }}
+        backend:
+{{ include "ingress.backend.cjoc" . | indent 10 -}}
+{{ if eq (include "ingress.apiVersion" .) "networking.k8s.io/v1" }}
+    {{ if (eq .Values.OperationsCenter.Platform "eks") }}
+        pathType: ImplementationSpecific
+    {{ else }}
+        pathType: Prefix
+    {{ end }}
+{{- end -}}
+{{ if or (ne (include "ingress.apiVersion" .) "networking.k8s.io/v1") (eq .Values.OperationsCenter.Platform "eks") }}
+      - path: {{ include "oc.contextpath" . }}/*
+        backend:
+{{ include "ingress.backend.cjoc" . | indent 10 -}}
+  {{ if eq (include "ingress.apiVersion" .) "networking.k8s.io/v1" }}
+    {{ if (eq .Values.OperationsCenter.Platform "eks") }}
+        pathType: ImplementationSpecific
+    {{ else }}
+        pathType: Prefix
+    {{ end }}
+  {{- end -}}
+{{- end -}}
+{{- if .Values.OperationsCenter.Ingress.tls.Enable }}
+  tls:
+    - hosts:
+        - {{ include "oc.hostnamewithoutport" . | quote }}
+      secretName: {{ .Values.OperationsCenter.Ingress.tls.SecretName }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
